@@ -26,9 +26,9 @@ class HomeController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
 
 
 case class Point(
-  hour: Int,
-  icon: String,
-  temp: Double
+  h: Int,
+  i: String,
+  t: Int
 )
 
 case class Response1(
@@ -52,10 +52,7 @@ case class Response1(
 		val darkSkyResponse: JsResult[Response] = Json.fromJson[Response](Json.parse(response.body))
 
 		darkSkyResponse match {
-			case r: JsSuccess[Response] => {
-				var point = r.get.hourly.data(0);
-			        jsonReponse = Json.toJson(new Response1("ok", r.get.hourly.data.map(point => new Point(LocalDateTime.ofEpochSecond(point.time, 0, ZoneOffset.ofHours(0)).getHour(), point.icon, point.temperature)))).toString();
-			}
+			case r: JsSuccess[Response] => jsonReponse = Json.toJson(new Response1("ok", r.get.hourly.data.map(point => new Point(LocalDateTime.ofEpochSecond(point.time, 0, ZoneOffset.ofHours(0)).getHour(), point.icon, (point.temperature + 0.5).toInt)))).toString();
 
 			case e: JsError => jsonReponse = Json.toJson(new Response1(e.toString(), List())).toString()
 		}
