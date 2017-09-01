@@ -29,7 +29,7 @@ case class Hourly(
   data: List[DataPoint]
 )
 
-case class Response(
+case class DarkSkyResponse(
   latitude: Double,
   longitude: Double,
   timezone: String,
