@@ -96,7 +96,7 @@ class HomeController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
       var latlng = params("latlng")
 
       val urlDarkSky = "https://api.darksky.net/forecast/1cbbfb780a7ada23c39be9ae9871754a/" + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
-      val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=AIzaSyBNn9OeFLgfA53CRm3dQbfCMns5xkO2gI8&result_type=locality&latlng=" + latlng
+      val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=AIzaSyBNn9OeFLgfA53CRm3dQbfCMns5xkO2gI8&result_type=political&latlng=" + latlng
 
       for {
         darkSky <- ws.url(urlDarkSky).get()
