@@ -60,7 +60,7 @@ class HomeController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
     if (darkSkyResponse.status == 200)
     {
       Json.fromJson[DarkSkyResponse](darkSkyResponse.json) match {
-        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.map(point => new GraphomaticPoint(LocalDateTime.ofEpochSecond(point.time, 0, ZoneOffset.ofHours(r.get.offset.toInt)).getHour(), point.icon, (point.temperature + 0.5).toInt));
+        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.take(10)map(point => new GraphomaticPoint(LocalDateTime.ofEpochSecond(point.time, 0, ZoneOffset.ofHours(r.get.offset.toInt)).getHour(), point.icon, (point.temperature + 0.5).toInt));
         case e: JsError => status = "DarkSkyFail:JsonValidation"
       }
     }
