@@ -54,6 +54,8 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
 
   def adjustUnixTime(unixTime: Long, zone: ZoneId ) : Long =
   {
+    return unixTime;
+    
     val offset = zone.getRules().getOffset(Instant.ofEpochSecond(unixTime))
 
     LocalDateTime.ofEpochSecond(unixTime, 0, offset).toEpochSecond(ZoneOffset.UTC)
