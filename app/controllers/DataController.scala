@@ -11,6 +11,8 @@ import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import play.api.libs.ws._
 
+import play.api.Logger
+
 import scala.concurrent.ExecutionContext.Implicits._
 
 import DarkSky._
@@ -36,7 +38,7 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
 
 
   case class GraphomaticPoint(
-    h: Int,
+    h: Long,
     i: String,
     t: Int
   )
@@ -44,24 +46,30 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
   case class GraphomaticResponse(
     stat: String,
     location: String,
-    data: List[GraphomaticPoint]
+    hourly: List[GraphomaticPoint]
   )
 
   implicit val gaphomaticPoitWrites = Json.writes[GraphomaticPoint]
   implicit val graphomaticResponseWritess = Json.writes[GraphomaticResponse]
 
+  def adjustUnixTime(unixTime: Long, zone: ZoneId ) : Long =
+  {
+    val offset = zone.getRules().getOffset(Instant.ofEpochSecond(unixTime))
+
+    LocalDateTime.ofEpochSecond(unixTime, 0, offset).toEpochSecond(ZoneOffset.UTC)
+  }
 
   def getResponse(darkSkyResponse: WSResponse, googleResponse: WSResponse) : Result = 
   {
-    var status = "OK"
+    var status = ""
     var location = "XXX"
     var data= List[GraphomaticPoint]()
 
     if (darkSkyResponse.status == 200)
     {
       Json.fromJson[DarkSkyResponse](darkSkyResponse.json) match {
-        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.take(10)map(point => new GraphomaticPoint(LocalDateTime.ofEpochSecond(point.time, 0, ZoneOffset.ofHours(r.get.offset.toInt)).getHour(), point.icon, (point.temperature + 0.5).toInt));
-        case e: JsError => status = "DarkSkyFail:JsonValidation"
+        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.take(10)map(point => new GraphomaticPoint(adjustUnixTime(point.time, ZoneId.of(r.get.timezone)), point.icon, (point.temperature + 0.5).toInt))
+        case e: JsError =>                    status = "DarkSkyFail:JsonValidation"
       }
     }
     else
