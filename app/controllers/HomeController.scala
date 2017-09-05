@@ -94,10 +94,10 @@ class HomeController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
       //var latlng = "45.671837,12.324886"
       //var latlng = "55.073965,82.909996"
       var latlng = params("latlng")
-      var darkskyapikey = params(“darkskyapikey”)
+      var darkskyapikey = params("darkskyapikey")
 
-      val urlDarkSky = "https://api.darksky.net/forecast/“ + darkskyapikey + ”/“ + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
-      val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=“ + sys.env(“googleapikey”) + ”&result_type=political&latlng=" + latlng
+      val urlDarkSky = "https://api.darksky.net/forecast/" + darkskyapikey + "/" + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
+      val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=" + sys.env("googleapikey") + "&result_type=political&latlng=" + latlng
 
       for {
         darkSky <- ws.url(urlDarkSky).get()
