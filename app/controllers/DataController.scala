@@ -10,6 +10,7 @@ import play.api.mvc._
 import play.api.libs.json._
 import play.api.libs.functional.syntax._
 import play.api.libs.ws._
+import play.api.cache._
 
 import play.api.Logger
 
@@ -19,12 +20,8 @@ import DarkSky._
 import Google._
 
 @Singleton
-class DataController @Inject()(cc: ControllerComponents, ws: WSClient) extends AbstractController(cc)
+class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: AsyncCacheApi) extends AbstractController(cc)
 {
-//  def index() = Action {
-//	implicit request: Request[AnyContent] => Ok(views.html.index())
-//  }
-
   implicit val dataPointReads = Json.reads[DataPoint]
   implicit val hourlyReads = Json.reads[Hourly]
   implicit val darkSkyResponseReads = Json.reads[DarkSkyResponse]
@@ -52,25 +49,31 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
   implicit val gaphomaticPoitWrites = Json.writes[GraphomaticPoint]
   implicit val graphomaticResponseWritess = Json.writes[GraphomaticResponse]
 
-  def adjustUnixTime(unixTime: Long, zone: ZoneId ) : Long =
+  def extractLocation(googleResponse: WSResponse) : String =
   {
-    return unixTime;
-    
-    val offset = zone.getRules().getOffset(Instant.ofEpochSecond(unixTime))
+    Logger.debug("Handle Google reponse")
 
-    LocalDateTime.ofEpochSecond(unixTime, 0, offset).toEpochSecond(ZoneOffset.UTC)
+    if (googleResponse.status != 200)
+    {
+      return "GoogleFail:" + googleResponse.status;
+    }
+
+    Json.fromJson[GoogleResponse](googleResponse.json) match
+    {
+        case r: JsSuccess[GoogleResponse] => r.get.results.lift(0) flatMap (_.address_components.lift(0)) map (_.long_name)  getOrElse "n/a"
+        case e: JsError => "GoogleFail:JsonValidation"
+    }
   }
 
-  def getResponse(darkSkyResponse: WSResponse, googleResponse: WSResponse) : Result = 
+  def getResponse(darkSkyResponse: WSResponse, location: String) : Result =
   {
     var status = ""
-    var location = "XXX"
     var data= List[GraphomaticPoint]()
 
     if (darkSkyResponse.status == 200)
     {
       Json.fromJson[DarkSkyResponse](darkSkyResponse.json) match {
-        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.take(10)map(point => new GraphomaticPoint(adjustUnixTime(point.time, ZoneId.of(r.get.timezone)), point.icon, (point.temperature + 0.5).toInt))
+        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.take(10) map (point => new GraphomaticPoint(point.time, point.icon, (point.temperature + 0.5).toInt))
         case e: JsError =>                    status = "DarkSkyFail:JsonValidation"
       }
     }
@@ -79,40 +82,20 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient) extends A
       status = "DarkSkyFail:" + darkSkyResponse.status;
     }
 
-    if (googleResponse.status == 200)
-    {
-      Json.fromJson[GoogleResponse](googleResponse.json) match {
-        case r: JsSuccess[GoogleResponse] => location = r.get.results(0).address_components(0).long_name
-        case e: JsError => status = "GoogleFail:JsonValidation"
-      }
-    }
-    else
-    {
-      status = "GoogleFail:" + googleResponse.status;
-    }
-
-
     Ok(Json.toJson(new GraphomaticResponse(status, location, data)))
   }
 
-  def index() = Action.async
+  def index(latlng: String, darkskyapikey: String) = Action.async
   {
     implicit request: Request[AnyContent] =>
     {
-      val params = request.queryString.map { case(k,v) => k->v.mkString}
-
-      //var latlng = "45.671837,12.324886"
-      //var latlng = "55.073965,82.909996"
-      var latlng = params("latlng")
-      var darkskyapikey = params("darkskyapikey")
-
       val urlDarkSky = "https://api.darksky.net/forecast/" + darkskyapikey + "/" + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
       val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=" + sys.env("googleapikey") + "&result_type=political&latlng=" + latlng
 
       for {
         darkSky <- ws.url(urlDarkSky).get()
-        google  <- ws.url(urlGoogle).get()
-      } yield getResponse(darkSky, google)
+        location  <- cache.getOrElseUpdate(latlng)(ws.url(urlGoogle).get().map(extractLocation))
+      } yield getResponse(darkSky, location)
     }
   }
 }
