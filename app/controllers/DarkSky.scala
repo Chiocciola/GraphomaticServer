@@ -22,12 +22,20 @@ case class DataPoint(
   visibility: Option[Double],
   ozone: Double
 )
+object DataPoint
+{
+  implicit val reads = Json.reads[DataPoint]
+}
 
 case class Hourly(
   summary: String,
   icon: String,
   data: List[DataPoint]
 )
+object Hourly
+{
+  implicit val reads = Json.reads[Hourly]
+}
 
 case class DarkSkyResponse(
   latitude: Double,
@@ -37,4 +45,7 @@ case class DarkSkyResponse(
   hourly: Hourly,
   offset: Double
 )
-
+object DarkSkyResponse
+{
+  implicit val reads = Json.reads[DarkSkyResponse]
+}
