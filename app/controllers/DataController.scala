@@ -38,37 +38,31 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
     }
   }
 
-  def getResponse(darkSkyResponse: WSResponse, location: String) : Result =
+  def extractForecast(darkSkyResponse: WSResponse) : (String, List[GraphomaticPoint]) =
   {
-    var status = ""
-    var data= List[GraphomaticPoint]()
-
-    if (darkSkyResponse.status == 200)
+    if (darkSkyResponse.status != 200)
     {
-      Json.fromJson[DarkSkyResponse](darkSkyResponse.json) match {
-        case r: JsSuccess[DarkSkyResponse] => data = r.get.hourly.data.take(10) map (point => new GraphomaticPoint(point.time, point.icon, (point.temperature + 0.5).toInt))
-        case e: JsError =>                    status = "DarkSkyFail:JsonValidation"
-      }
-    }
-    else
-    {
-      status = "DarkSkyFail:" + darkSkyResponse.status;
+      return ("DarkSkyFail:" + darkSkyResponse.status, List[GraphomaticPoint]())
     }
 
-    Ok(Json.toJson(new GraphomaticResponse(status, location, data)))
+    Json.fromJson[DarkSkyResponse](darkSkyResponse.json) match
+    {
+      case r: JsSuccess[DarkSkyResponse] => ("", r.get.hourly.data.take(10) map (p => new GraphomaticPoint(p.time, p.icon, (p.temperature + 0.5).toInt)))
+      case e: JsError =>                    ("DarkSkyFail:JsonValidation", List[GraphomaticPoint]())
+    }
   }
 
   def index(latlng: String, darkskyapikey: String) = Action.async
   {
     implicit request: Request[AnyContent] =>
     {
-      val urlDarkSky = "https://api.darksky.net/forecast/" + darkskyapikey + "/" + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
+      val urlDarkSky = "https://api.darksky.net/forecast/" + darkskyapikey.filter(_.isLetterOrDigit) + "/" + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
       val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=" + sys.env("googleapikey") + "&result_type=political&latlng=" + latlng
 
       for {
-        darkSky <- ws.url(urlDarkSky).get()
-        location  <- cache.getOrElseUpdate(latlng)(ws.url(urlGoogle).get().map(extractLocation))
-      } yield getResponse(darkSky, location)
+        (status, data) <- ws.url(urlDarkSky).get() map extractForecast
+        location       <- cache.getOrElseUpdate(latlng)(ws.url(urlGoogle).get() map extractLocation)
+      } yield Ok(Json.toJson(new GraphomaticResponse(status, location, data)))
     }
   }
 }
