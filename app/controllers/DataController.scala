@@ -24,8 +24,6 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 {
   def extractLocation(googleResponse: WSResponse) : String =
   {
-    Logger.debug("Handle Google reponse")
-
     if (googleResponse.status != 200)
     {
       return "GoogleFail:" + googleResponse.status;
@@ -54,10 +52,13 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 
   def index(latlng: String, darkskyapikey: String) = Action.async
   {
+    var darkSkyApiKeySafe = darkskyapikey.filter(_.isLetterOrDigit)
+    var googleApiKey = sys.env("googleapikey")
+
     implicit request: Request[AnyContent] =>
     {
-      val urlDarkSky = "https://api.darksky.net/forecast/" + darkskyapikey.filter(_.isLetterOrDigit) + "/" + latlng + "?exclude=minutely,daily,alerts,flags&units=auto"
-      val urlGoogle  = "https://maps.googleapis.com/maps/api/geocode/json?key=" + sys.env("googleapikey") + "&result_type=political&latlng=" + latlng
+      val urlDarkSky = s"https://api.darksky.net/forecast/$darkSkyApiKeySafe/$latlng?exclude=minutely,daily,alerts,flags&units=auto"
+      val urlGoogle  = s"https://maps.googleapis.com/maps/api/geocode/json?key=$googleApiKey&result_type=political&latlng=$latlng"
 
       for {
         (status, data) <- ws.url(urlDarkSky).get() map extractForecast
