@@ -22,6 +22,9 @@ import Graphomatic._
 @Singleton
 class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: AsyncCacheApi) extends AbstractController(cc)
 {
+  var apiV1Calls = collection.mutable.Map[String, Long]().withDefaultValue(0)
+  var apiV2Calls = collection.mutable.Map[String, Long]().withDefaultValue(0)
+
   val icons = Map(
    "clear-day"           -> 1, 
    "clear-night"         -> 2,
@@ -81,6 +84,8 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 
   def index(latlng: String, darkskyapikey: String) = Action.async
   {
+  	apiV1Calls(darkskyapikey) += 1
+
     var darkSkyApiKeySafe = darkskyapikey.filter(_.isLetterOrDigit)
     var googleApiKey = sys.env("googleapikey")
 
@@ -98,6 +103,8 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 
   def index2(latlng: String, darkskyapikey: String) = Action.async
   {
+	apiV2Calls(darkskyapikey) += 1
+
     var darkSkyApiKeySafe = darkskyapikey.filter(_.isLetterOrDigit)
     var googleApiKey = sys.env("googleapikey")
 
@@ -112,4 +119,9 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
       } yield Ok(Json.toJson(new Graphomatic2Response(status, location, hours, icons, temp)))
     }
   }
+
+  def stat() = Action {
+	implicit request: Request[AnyContent] => Ok(views.html.stat(apiV1Calls, apiV2Calls))
+  }
+
 }

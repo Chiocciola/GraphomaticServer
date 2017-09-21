@@ -1,0 +1,17 @@
+@(apiV1Calls: collection.mutable.Map[String, Long], apiV2Calls: collection.mutable.Map[String, Long])
+
+@main("Graphomatic") {
+    <h2>APIv1 calls stats</h2>
+	<ul>
+	@for(callsCount <- apiV1Calls.values) {
+	  <li>@callsCount</li>
+	}
+	</ul>
+
+    <h2>APIv2 calls stats</h2>
+	<ul>
+	@for(callsCount <- apiV2Calls.values) {
+	  <li>@callsCount</li>
+	}
+	</ul>
+}
