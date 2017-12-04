@@ -7,6 +7,7 @@
 GET     /                           controllers.HomeController.index
 GET     /data                       controllers.DataController.index(latlng, darkskyapikey)
 GET     /data2                      controllers.DataController.index2(latlng, darkskyapikey)
+GET     /data3                      controllers.DataController.index3(latlng, k)
 GET     /stat                       controllers.DataController.stat
 
 # Map static resources from the /public folder to the /assets URL path

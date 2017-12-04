@@ -24,9 +24,10 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 {
   var apiV1Calls = collection.mutable.Map[String, Long]().withDefaultValue(0)
   var apiV2Calls = collection.mutable.Map[String, Long]().withDefaultValue(0)
+  var apiV3Calls = collection.mutable.Map[String, Long]().withDefaultValue(0)
 
   val icons = Map(
-   "clear-day"           -> 1, 
+   "clear-day"           -> 1,
    "clear-night"         -> 2,
    "wind"                -> 3,
    "fog"                 -> 4,
@@ -38,7 +39,7 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
    "snow"                -> 10
   ).withDefaultValue(0)
 
-    
+
 
   def extractLocation(googleResponse: WSResponse) : String =
   {
@@ -82,6 +83,20 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
     }
   }
 
+  def extractForecast3(darkSkyResponse: WSResponse) : (String, List[Long], List[Long], List[Long]) =
+  {
+    if (darkSkyResponse.status != 200)
+    {
+      return ("DarkSkyFail:" + darkSkyResponse.status, List[Long](), List[Long](), List[Long]())
+    }
+
+    Json.fromJson[DarkSkyResponse](darkSkyResponse.json) match
+    {
+      case r: JsSuccess[DarkSkyResponse] => ("",                           r.get.hourly.data.take(10) map (p => p.time.toLong), r.get.hourly.data.take(10) map (p => icons(p.icon).toLong), r.get.hourly.data.take(10) map (p => (p.temperature + 0.5).toLong))
+      case e: JsError =>                    ("DarkSkyFail:JsonValidation", List[Long](),                                        List[Long](),                                        List[Long]())
+    }
+  }
+
   def index(latlng: String, darkskyapikey: String) = Action.async
   {
   	apiV1Calls(darkskyapikey) += 1
@@ -103,7 +118,7 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 
   def index2(latlng: String, darkskyapikey: String) = Action.async
   {
-	apiV2Calls(darkskyapikey) += 1
+    apiV2Calls(darkskyapikey) += 1
 
     var darkSkyApiKeySafe = darkskyapikey.filter(_.isLetterOrDigit)
     var googleApiKey = sys.env("googleapikey")
@@ -120,8 +135,33 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
     }
   }
 
-  def stat() = Action {
-	implicit request: Request[AnyContent] => Ok(views.html.stat(apiV1Calls, apiV2Calls))
+  def index3(latlng: String, k: String) = Action.async
+  {
+    apiV3Calls(k) += 1
+
+    var darkSkyApiKeySafe = k.filter(_.isLetterOrDigit)
+
+    if (darkSkyApiKeySafe == "")
+    {
+      darkSkyApiKeySafe = sys.env("darkskyapikey")
+    }
+
+    var googleApiKey = sys.env("googleapikey")
+
+    implicit request: Request[AnyContent] =>
+    {
+      val urlDarkSky = s"https://api.darksky.net/forecast/$darkSkyApiKeySafe/$latlng?exclude=minutely,daily,alerts,flags&units=auto"
+      val urlGoogle  = s"https://maps.googleapis.com/maps/api/geocode/json?key=$googleApiKey&result_type=political&latlng=$latlng"
+
+      for {
+        (status, hours, icons, temp) <- ws.url(urlDarkSky).get() map extractForecast3
+        location                     <- cache.getOrElseUpdate(latlng)(ws.url(urlGoogle).get() map extractLocation)
+      } yield Ok(Json.toJson(new Graphomatic3Response(status, location, List(hours, icons, temp).transpose.flatten)))
+    }
   }
 
+  def stat() = Action
+  {
+	   implicit request: Request[AnyContent] => Ok(views.html.stat(apiV1Calls, apiV2Calls))
+  }
 }

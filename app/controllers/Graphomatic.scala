@@ -34,3 +34,14 @@ object Graphomatic2Response
 {
   implicit val writes = Json.writes[Graphomatic2Response]
 }
+
+
+case class Graphomatic3Response(
+  s: String,
+  l: String,
+  d: List[Long],
+)
+object Graphomatic3Response
+{
+  implicit val writes = Json.writes[Graphomatic3Response]
+}
