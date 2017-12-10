@@ -71,6 +71,11 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
 
   def extractForecast2(darkSkyResponse: WSResponse) : (String, List[Long], List[Int], List[Int]) =
   {
+    if (darkSkyResponse.status == 403)
+    {
+      return ("Set DarkSky API key", List[Long](), List[Int](), List[Int]())
+    }
+
     if (darkSkyResponse.status != 200)
     {
       return ("DarkSkyFail:" + darkSkyResponse.status, List[Long](), List[Int](), List[Int]())
@@ -121,6 +126,12 @@ class DataController @Inject()(cc: ControllerComponents, ws: WSClient, cache: As
     apiV2Calls(darkskyapikey) += 1
 
     var darkSkyApiKeySafe = darkskyapikey.filter(_.isLetterOrDigit)
+
+    if (darkSkyApiKeySafe == "")
+    {
+      darkSkyApiKeySafe = sys.env("darkskyapikey")
+    }
+
     var googleApiKey = sys.env("googleapikey")
 
     implicit request: Request[AnyContent] =>
